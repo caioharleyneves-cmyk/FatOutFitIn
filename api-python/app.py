@@ -3,7 +3,9 @@ FatOutFitIn - API Python (Flask)
 
 Responsável por:
   * Usuários (cadastro e login)
-  * Cards de refeições (preparo de refeições semanais)
+  * Catálogo de alimentos com informações nutricionais
+  * Cards de refeições (preparo de refeições semanais), com cálculo de
+    kcal, proteínas, carboidratos, gorduras, fibras e sódio por ingrediente
   * Resumo nutricional da semana
 
 Roda na porta 5000. Os dados ficam em um banco SQLite local (fatoutfitin.db).
@@ -12,11 +14,14 @@ import json
 import os
 import re
 import sqlite3
+import unicodedata
 
 from flask import Flask, g, jsonify, request
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
+
+from alimentos import ALIMENTOS, ALIMENTOS_POR_ID, CATEGORIAS, NUTRIENTES
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("FOFI_DB", os.path.join(BASE_DIR, "fatoutfitin.db"))
@@ -25,6 +30,13 @@ DIAS = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"]
 TIPOS = ["cafe", "almoco", "lanche", "jantar", "pre-treino", "pos-treino", "ceia"]
 CORES = ["padrao", "vermelho", "laranja", "amarelo", "verde", "azul", "roxo", "rosa"]
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+# Nutriente -> coluna no banco (kcal fica na coluna "calorias", que já existia)
+COLUNAS = {"kcal": "calorias", "proteinas": "proteinas", "carboidratos": "carboidratos",
+           "gorduras": "gorduras", "fibras": "fibras", "sodio": "sodio"}
+# Limites aceitos para valores informados manualmente (ingrediente "Outro")
+LIMITES = {"kcal": 10000, "proteinas": 1000, "carboidratos": 1000, "gorduras": 1000,
+           "fibras": 500, "sodio": 50000}
 
 app = Flask(__name__)
 app.json.ensure_ascii = False
@@ -68,20 +80,29 @@ def criar_tabelas(db):
             senha_hash  TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS refeicoes (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
-            titulo      TEXT NOT NULL,
-            dia         TEXT NOT NULL,
-            tipo        TEXT NOT NULL,
-            cor         TEXT NOT NULL DEFAULT 'padrao',
-            fixado      INTEGER NOT NULL DEFAULT 0,
-            calorias    INTEGER NOT NULL DEFAULT 0,
-            proteinas   INTEGER NOT NULL DEFAULT 0,
-            itens       TEXT NOT NULL DEFAULT '[]',
-            notas       TEXT NOT NULL DEFAULT ''
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            usuario_id    INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+            titulo        TEXT NOT NULL,
+            dia           TEXT NOT NULL,
+            tipo          TEXT NOT NULL,
+            cor           TEXT NOT NULL DEFAULT 'padrao',
+            fixado        INTEGER NOT NULL DEFAULT 0,
+            calorias      REAL NOT NULL DEFAULT 0,
+            proteinas     REAL NOT NULL DEFAULT 0,
+            carboidratos  REAL NOT NULL DEFAULT 0,
+            gorduras      REAL NOT NULL DEFAULT 0,
+            fibras        REAL NOT NULL DEFAULT 0,
+            sodio         REAL NOT NULL DEFAULT 0,
+            itens         TEXT NOT NULL DEFAULT '[]',
+            notas         TEXT NOT NULL DEFAULT ''
         );
         """
     )
+    # Migração: bancos criados pela versão anterior não tinham estas colunas
+    existentes = {row[1] for row in db.execute("PRAGMA table_info(refeicoes)")}
+    for coluna in ("carboidratos", "gorduras", "fibras", "sodio"):
+        if coluna not in existentes:
+            db.execute(f"ALTER TABLE refeicoes ADD COLUMN {coluna} REAL NOT NULL DEFAULT 0")
     db.commit()
 
 
@@ -134,16 +155,86 @@ def usuario_atual():
     return usuario["id"]
 
 
-def inteiro_nao_negativo(valor, campo):
+def numero(valor, campo, minimo, maximo, padrao=0.0):
+    """Converte para float validando o intervalo; vazio/None vira o padrão."""
     if valor is None or valor == "":
-        return 0
+        return padrao
+    if isinstance(valor, bool):
+        raise ApiError(400, f"O campo '{campo}' deve ser numérico.")
     try:
-        numero = int(valor)
+        n = float(valor)
     except (TypeError, ValueError):
-        raise ApiError(400, f"O campo '{campo}' deve ser um número inteiro.")
-    if numero < 0 or numero > 100000:
-        raise ApiError(400, f"O campo '{campo}' deve estar entre 0 e 100000.")
-    return numero
+        raise ApiError(400, f"O campo '{campo}' deve ser numérico.")
+    if n != n or n < minimo or n > maximo:  # n != n detecta NaN
+        raise ApiError(400, f"O campo '{campo}' deve estar entre {minimo:g} e {maximo:g}.")
+    return n
+
+
+def arredondar(nutriente, valor):
+    # kcal e sódio (mg) inteiros; gramas com 1 casa decimal
+    return round(valor) if nutriente in ("kcal", "sodio") else round(valor, 1)
+
+
+def nutrientes_zerados():
+    return {n: 0 for n in NUTRIENTES}
+
+
+def calcular_nutrientes(alimento, quantidade):
+    fator = quantidade / 100
+    return {n: arredondar(n, alimento["por100"][n] * fator) for n in NUTRIENTES}
+
+
+def validar_item(item, posicao):
+    """
+    Dois formatos de ingrediente:
+      * do catálogo:  {"alimentoId": 5, "quantidade": 150, "feito": false}
+                      -> nome e nutrientes são calculados pela API
+      * "Outro":      {"texto": "Molho caseiro", "quantidade": 50,
+                       "nutrientes": {"kcal": 40, "proteinas": 1, ...}, "feito": false}
+                      -> valores informados pelo usuário para aquela quantidade
+    """
+    if not isinstance(item, dict):
+        raise ApiError(400, f"O item {posicao} deve ser um objeto.")
+    feito = bool(item.get("feito", False))
+    alimento_id = item.get("alimentoId")
+
+    if alimento_id not in (None, ""):
+        try:
+            alimento = ALIMENTOS_POR_ID.get(int(alimento_id))
+        except (TypeError, ValueError):
+            alimento = None
+        if alimento is None:
+            raise ApiError(400, f"Item {posicao}: alimento {alimento_id} não existe no catálogo.")
+        quantidade = numero(item.get("quantidade"), f"itens[{posicao}].quantidade", 1, 5000,
+                            padrao=alimento["porcao"])
+        return {
+            "alimentoId": alimento["id"],
+            "texto": alimento["nome"],
+            "quantidade": round(quantidade, 1),
+            "unidade": alimento["unidade"],
+            "feito": feito,
+            "nutrientes": calcular_nutrientes(alimento, quantidade),
+        }
+
+    texto = str(item.get("texto", "")).strip()
+    if not texto:
+        raise ApiError(400, f"Item {posicao}: informe um alimento do catálogo ou o nome do ingrediente.")
+    quantidade = numero(item.get("quantidade"), f"itens[{posicao}].quantidade", 0, 5000, padrao=None)
+    informados = item.get("nutrientes") or {}
+    if not isinstance(informados, dict):
+        raise ApiError(400, f"Item {posicao}: 'nutrientes' deve ser um objeto.")
+    nutrientes = {
+        n: arredondar(n, numero(informados.get(n), f"itens[{posicao}].nutrientes.{n}", 0, LIMITES[n]))
+        for n in NUTRIENTES
+    }
+    return {
+        "alimentoId": None,
+        "texto": texto[:120],
+        "quantidade": None if quantidade is None else round(quantidade, 1),
+        "unidade": "g",
+        "feito": feito,
+        "nutrientes": nutrientes,
+    }
 
 
 def validar_refeicao(dados):
@@ -168,11 +259,12 @@ def validar_refeicao(dados):
     itens_brutos = dados.get("itens", [])
     if not isinstance(itens_brutos, list):
         raise ApiError(400, "'itens' deve ser uma lista.")
-    itens = []
-    for item in itens_brutos:
-        if not isinstance(item, dict) or not str(item.get("texto", "")).strip():
-            raise ApiError(400, "Cada item precisa ter um 'texto' não vazio.")
-        itens.append({"texto": str(item["texto"]).strip()[:120], "feito": bool(item.get("feito", False))})
+    if len(itens_brutos) > 50:
+        raise ApiError(400, "Uma refeição pode ter no máximo 50 itens.")
+    itens = [validar_item(item, i + 1) for i, item in enumerate(itens_brutos)]
+
+    # Totais da refeição = soma dos ingredientes
+    totais = {n: arredondar(n, sum(i["nutrientes"][n] for i in itens)) for n in NUTRIENTES}
 
     return {
         "titulo": titulo,
@@ -180,11 +272,18 @@ def validar_refeicao(dados):
         "tipo": tipo,
         "cor": cor,
         "fixado": 1 if dados.get("fixado") else 0,
-        "calorias": inteiro_nao_negativo(dados.get("calorias"), "calorias"),
-        "proteinas": inteiro_nao_negativo(dados.get("proteinas"), "proteinas"),
         "itens": json.dumps(itens, ensure_ascii=False),
         "notas": str(dados.get("notas", "") or "")[:500],
+        **{COLUNAS[n]: v for n, v in totais.items()},
     }
+
+
+def item_compativel(item):
+    """Itens salvos pela versão antiga só tinham texto/feito."""
+    if "nutrientes" not in item:
+        item = {"alimentoId": None, "texto": item.get("texto", ""), "quantidade": None,
+                "unidade": "g", "feito": bool(item.get("feito")), "nutrientes": nutrientes_zerados()}
+    return item
 
 
 def refeicao_para_json(row):
@@ -195,9 +294,8 @@ def refeicao_para_json(row):
         "tipo": row["tipo"],
         "cor": row["cor"],
         "fixado": bool(row["fixado"]),
-        "calorias": row["calorias"],
-        "proteinas": row["proteinas"],
-        "itens": json.loads(row["itens"]),
+        "nutrientes": {n: arredondar(n, row[COLUNAS[n]] or 0) for n in NUTRIENTES},
+        "itens": [item_compativel(i) for i in json.loads(row["itens"])],
         "notas": row["notas"],
     }
 
@@ -209,6 +307,10 @@ def buscar_refeicao(refeicao_id, usuario_id):
     if row is None:
         raise ApiError(404, f"Refeição {refeicao_id} não encontrada.")
     return row
+
+
+def sem_acento(texto):
+    return "".join(c for c in unicodedata.normalize("NFD", texto.lower()) if unicodedata.category(c) != "Mn")
 
 
 # --------------------------------------------------------------------------- #
@@ -262,7 +364,41 @@ def login():
     return jsonify({"id": row["id"], "nome": row["nome"], "email": row["email"]})
 
 
+# ---- Catálogo de alimentos ------------------------------------------------ #
+@app.get("/api/alimentos")
+def listar_alimentos():
+    """Lista o catálogo (valores por 100 g/ml). Filtros: ?busca=frango&categoria=Proteínas"""
+    resultado = ALIMENTOS
+    categoria = request.args.get("categoria")
+    if categoria:
+        if categoria not in CATEGORIAS:
+            raise ApiError(400, f"Categoria inválida. Use uma destas: {', '.join(CATEGORIAS)}.")
+        resultado = [a for a in resultado if a["categoria"] == categoria]
+    busca = sem_acento(request.args.get("busca", "").strip())
+    if busca:
+        resultado = [a for a in resultado if busca in sem_acento(a["nome"])]
+    return jsonify(resultado)
+
+
+@app.get("/api/alimentos/<int:alimento_id>")
+def obter_alimento(alimento_id):
+    """Detalhe do alimento; com ?quantidade=150 devolve também os nutrientes para essa quantidade."""
+    alimento = ALIMENTOS_POR_ID.get(alimento_id)
+    if alimento is None:
+        raise ApiError(404, f"Alimento {alimento_id} não encontrado.")
+    resposta = dict(alimento)
+    if "quantidade" in request.args:
+        quantidade = numero(request.args.get("quantidade"), "quantidade", 1, 5000)
+        resposta["quantidade"] = quantidade
+        resposta["nutrientes"] = calcular_nutrientes(alimento, quantidade)
+    return jsonify(resposta)
+
+
 # ---- Refeições ------------------------------------------------------------ #
+def _colunas_refeicao():
+    return ["titulo", "dia", "tipo", "cor", "fixado", "itens", "notas", *COLUNAS.values()]
+
+
 @app.get("/api/refeicoes")
 def listar_refeicoes():
     usuario_id = usuario_atual()
@@ -290,13 +426,12 @@ def obter_refeicao(refeicao_id):
 def criar_refeicao():
     usuario_id = usuario_atual()
     r = validar_refeicao(corpo_json())
+    colunas = _colunas_refeicao()
     db = get_db()
     cur = db.execute(
-        """INSERT INTO refeicoes
-           (usuario_id, titulo, dia, tipo, cor, fixado, calorias, proteinas, itens, notas)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (usuario_id, r["titulo"], r["dia"], r["tipo"], r["cor"], r["fixado"],
-         r["calorias"], r["proteinas"], r["itens"], r["notas"]),
+        f"INSERT INTO refeicoes (usuario_id, {', '.join(colunas)}) "
+        f"VALUES (?, {', '.join('?' for _ in colunas)})",
+        (usuario_id, *[r[c] for c in colunas]),
     )
     db.commit()
     return jsonify(refeicao_para_json(buscar_refeicao(cur.lastrowid, usuario_id))), 201
@@ -307,12 +442,11 @@ def atualizar_refeicao(refeicao_id):
     usuario_id = usuario_atual()
     buscar_refeicao(refeicao_id, usuario_id)
     r = validar_refeicao(corpo_json())
+    colunas = _colunas_refeicao()
     db = get_db()
     db.execute(
-        """UPDATE refeicoes SET titulo=?, dia=?, tipo=?, cor=?, fixado=?, calorias=?,
-           proteinas=?, itens=?, notas=? WHERE id=? AND usuario_id=?""",
-        (r["titulo"], r["dia"], r["tipo"], r["cor"], r["fixado"], r["calorias"],
-         r["proteinas"], r["itens"], r["notas"], refeicao_id, usuario_id),
+        f"UPDATE refeicoes SET {', '.join(f'{c} = ?' for c in colunas)} WHERE id = ? AND usuario_id = ?",
+        (*[r[c] for c in colunas], refeicao_id, usuario_id),
     )
     db.commit()
     return jsonify(refeicao_para_json(buscar_refeicao(refeicao_id, usuario_id)))
@@ -330,29 +464,28 @@ def excluir_refeicao(refeicao_id):
 
 @app.get("/api/refeicoes/resumo")
 def resumo_refeicoes():
-    """Totais de calorias, proteínas e refeições por dia da semana."""
+    """Totais de kcal e macronutrientes por dia da semana, total e média diária."""
     usuario_id = usuario_atual()
+    somas = ", ".join(f"SUM({c}) AS {n}" for n, c in COLUNAS.items())
     rows = get_db().execute(
-        """SELECT dia, COUNT(*) AS qtd, SUM(calorias) AS kcal, SUM(proteinas) AS prot
-           FROM refeicoes WHERE usuario_id = ? GROUP BY dia""",
+        f"SELECT dia, COUNT(*) AS qtd, {somas} FROM refeicoes WHERE usuario_id = ? GROUP BY dia",
         (usuario_id,),
     ).fetchall()
-    por_dia = {d: {"dia": d, "refeicoes": 0, "calorias": 0, "proteinas": 0} for d in DIAS}
+
+    por_dia = {d: {"dia": d, "refeicoes": 0, "nutrientes": nutrientes_zerados()} for d in DIAS}
     for row in rows:
         por_dia[row["dia"]] = {
             "dia": row["dia"],
             "refeicoes": row["qtd"],
-            "calorias": row["kcal"] or 0,
-            "proteinas": row["prot"] or 0,
+            "nutrientes": {n: arredondar(n, row[n] or 0) for n in NUTRIENTES},
         }
     dias = [por_dia[d] for d in DIAS]
-    total_kcal = sum(d["calorias"] for d in dias)
+    total = {n: arredondar(n, sum(d["nutrientes"][n] for d in dias)) for n in NUTRIENTES}
     return jsonify({
         "dias": dias,
         "totalRefeicoes": sum(d["refeicoes"] for d in dias),
-        "totalCalorias": total_kcal,
-        "totalProteinas": sum(d["proteinas"] for d in dias),
-        "mediaCaloriasDia": round(total_kcal / 7),
+        "total": total,
+        "mediaDiaria": {n: arredondar(n, v / 7) for n, v in total.items()},
     })
 
 

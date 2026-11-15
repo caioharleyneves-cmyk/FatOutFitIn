@@ -59,6 +59,7 @@ const apiPython = {
   health: () => requisicao(API_PYTHON, "/health"),
   cadastrar: (dados) => requisicao(API_PYTHON, "/usuarios", { method: "POST", body: dados }),
   login: (dados) => requisicao(API_PYTHON, "/login", { method: "POST", body: dados }),
+  listarAlimentos: () => requisicao(API_PYTHON, "/alimentos"),
   listarRefeicoes: () => requisicao(API_PYTHON, "/refeicoes"),
   criarRefeicao: (r) => requisicao(API_PYTHON, "/refeicoes", { method: "POST", body: r }),
   atualizarRefeicao: (id, r) => requisicao(API_PYTHON, `/refeicoes/${id}`, { method: "PUT", body: r }),

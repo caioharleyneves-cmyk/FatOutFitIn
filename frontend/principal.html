@@ -80,17 +80,13 @@
                         <option value="ceia">Ceia</option>
                     </select>
                 </label>
-                <label class="so-refeicao">Calorias (kcal)
-                    <input name="calorias" type="number" min="0">
-                </label>
-                <label class="so-refeicao">Proteínas (g)
-                    <input name="proteinas" type="number" min="0">
-                </label>
             </div>
 
             <h4 id="titulo-itens">Itens</h4>
+            <p class="so-refeicao ajuda">Escolha um alimento do catálogo (valores por porção calculados pela API Python) ou "Outro" para informar os valores manualmente.</p>
             <div id="lista-itens" class="lista-itens"></div>
             <button type="button" id="add-item" class="btn-texto">+ Adicionar item</button>
+            <div id="totais-editor" class="so-refeicao totais-editor"></div>
 
             <label>Notas
                 <textarea name="notas" rows="2" maxlength="500" placeholder="Observações, modo de preparo, dicas..."></textarea>

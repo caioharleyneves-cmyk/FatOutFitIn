@@ -14,8 +14,18 @@ const NOME_TIPO = {
   "pre-treino": "Pré-treino", "pos-treino": "Pós-treino", ceia: "Ceia",
 };
 const CORES = ["padrao", "vermelho", "laranja", "amarelo", "verde", "azul", "roxo", "rosa"];
+const NUTRIENTES = [
+  { k: "kcal", rotulo: "Calorias", curto: "", un: "kcal" },
+  { k: "proteinas", rotulo: "Proteínas", curto: "P", un: "g" },
+  { k: "carboidratos", rotulo: "Carboidratos", curto: "C", un: "g" },
+  { k: "gorduras", rotulo: "Gorduras", curto: "G", un: "g" },
+  { k: "fibras", rotulo: "Fibras", curto: "Fib", un: "g" },
+  { k: "sodio", rotulo: "Sódio", curto: "Na", un: "mg" },
+];
 
 const estado = {
+  alimentos: [],
+  alimentosPorId: {},
   treinos: [],
   refeicoes: [],
   resumoTreinos: null,
@@ -32,6 +42,25 @@ const esc = (s) =>
 
 function diaDeHoje() {
   return ["dom", "seg", "ter", "qua", "qui", "sex", "sab"][new Date().getDay()];
+}
+
+// kcal e sódio inteiros; gramas com no máximo 1 casa decimal
+function fmt(valor, k) {
+  const n = Number(valor) || 0;
+  return k === "kcal" || k === "sodio" ? String(Math.round(n)) : String(Math.round(n * 10) / 10).replace(".", ",");
+}
+
+function somaNutrientes(lista) {
+  const total = Object.fromEntries(NUTRIENTES.map((n) => [n.k, 0]));
+  lista.forEach((nutr) => NUTRIENTES.forEach((n) => (total[n.k] += Number(nutr?.[n.k]) || 0)));
+  return total;
+}
+
+function htmlMacros(nutr, classe = "macros") {
+  if (!nutr) return "";
+  return `<div class="${classe}">${NUTRIENTES.map((n) =>
+    `<span class="macro m-${n.k}" title="${n.rotulo}">${n.curto ? `<b>${n.curto}</b> ` : "🔥 "}${fmt(nutr[n.k], n.k)} ${n.un}</span>`
+  ).join("")}</div>`;
 }
 
 function toast(texto, erro = false) {
@@ -53,12 +82,17 @@ async function verificarApis() {
 }
 
 async function carregarTudo() {
-  const [treinos, refeicoes, rt, rr] = await Promise.allSettled([
+  const [treinos, refeicoes, rt, rr, alimentos] = await Promise.allSettled([
     apiJava.listarTreinos(),
     apiPython.listarRefeicoes(),
     apiJava.resumoTreinos(),
     apiPython.resumoRefeicoes(),
+    apiPython.listarAlimentos(),
   ]);
+  if (alimentos.status === "fulfilled") {
+    estado.alimentos = alimentos.value;
+    estado.alimentosPorId = Object.fromEntries(alimentos.value.map((a) => [a.id, a]));
+  }
   estado.treinos = treinos.status === "fulfilled" ? treinos.value : [];
   estado.refeicoes = refeicoes.status === "fulfilled" ? refeicoes.value : [];
   estado.resumoTreinos = rt.status === "fulfilled" ? rt.value : null;
@@ -114,9 +148,15 @@ function htmlItens(card) {
       .join("");
   }
   return card.itens
-    .map((it, i) => `<li class="${it.feito ? "feito" : ""}">
+    .map((it, i) => {
+      const detalhes = [
+        it.quantidade ? `${fmt(it.quantidade)} ${it.unidade || "g"}` : "",
+        it.nutrientes?.kcal ? `${fmt(it.nutrientes.kcal, "kcal")} kcal` : "",
+      ].filter(Boolean).join(" · ");
+      return `<li class="${it.feito ? "feito" : ""}">
       <label><input type="checkbox" data-acao="marcar" data-indice="${i}" ${it.feito ? "checked" : ""}>
-      <span>${esc(it.texto)}</span></label></li>`)
+      <span>${esc(it.texto)}</span></label>${detalhes ? `<small>${esc(detalhes)}</small>` : ""}</li>`;
+    })
     .join("");
 }
 
@@ -128,7 +168,8 @@ function htmlCard(card) {
 
   const meta = ehTreino
     ? [card.grupoMuscular, card.duracaoMin ? `⏱ ${card.duracaoMin} min` : ""]
-    : [NOME_TIPO[card.tipo], card.calorias ? `🔥 ${card.calorias} kcal` : "", card.proteinas ? `💪 ${card.proteinas} g prot.` : ""];
+    : [NOME_TIPO[card.tipo]];
+  const macros = !ehTreino && card.itens.length ? htmlMacros(card.nutrientes) : "";
 
   return `
   <article class="card cor-${card.cor}" data-tipo="${card._tipo}" data-id="${card.id}">
@@ -139,6 +180,7 @@ function htmlCard(card) {
     </header>
     <h3 data-acao="editar">${esc(card.titulo)}</h3>
     <p class="meta">${meta.filter(Boolean).map(esc).join(" · ")}</p>
+    ${macros}
     ${itens.length ? `<ul class="checklist">${htmlItens(card)}</ul>
       <div class="progresso" title="${feitos}/${itens.length} concluído(s)"><span style="width:${progresso}%"></span></div>` : ""}
     ${card.notas ? `<p class="notas">${esc(card.notas)}</p>` : ""}
@@ -174,8 +216,11 @@ function renderizarResumo() {
     rt ? bloco("exercícios concluídos", `${rt.progressoSemana}%`, "☕ Java") : "",
     rt ? bloco("dias de descanso", rt.diasDeDescanso, "☕ Java") : "",
     rr ? bloco("refeições planejadas", rr.totalRefeicoes, "🐍 Python") : "",
-    rr ? bloco("kcal média/dia", rr.mediaCaloriasDia, "🐍 Python") : "",
-    rr ? bloco("g de proteína/semana", rr.totalProteinas, "🐍 Python") : "",
+    rr ? bloco("kcal média/dia", fmt(rr.mediaDiaria.kcal, "kcal"), "🐍 Python") : "",
+    rr ? bloco("P · C · G média/dia (g)",
+      ["proteinas", "carboidratos", "gorduras"].map((k) => fmt(rr.mediaDiaria[k], k)).join(" · "), "🐍 Python") : "",
+    rr ? bloco("fibras média/dia (g)", fmt(rr.mediaDiaria.fibras, "fibras"), "🐍 Python") : "",
+    rr ? bloco("sódio média/dia (mg)", fmt(rr.mediaDiaria.sodio, "sodio"), "🐍 Python") : "",
   ].join("");
 }
 
@@ -191,8 +236,9 @@ function renderizarSemana() {
       <h3>${nome}${codigo === hoje ? " <small>hoje</small>" : ""}</h3>
       <div class="totais">
         ${t ? (t.treinos ? `<span>🏋️ ${t.treinos} treino(s) · ${t.series} séries · ${t.progresso}%</span>` : "<span>😴 Descanso</span>") : ""}
-        ${r ? `<span>🍽️ ${r.refeicoes} refeição(ões) · ${r.calorias} kcal · ${r.proteinas} g prot.</span>` : ""}
+        ${r ? `<span>🍽️ ${r.refeicoes} refeição(ões)</span>` : ""}
       </div>
+      ${r && r.refeicoes ? htmlMacros(r.nutrientes, "macros macros-dia") : ""}
       ${doDia.map(htmlCard).join("") || '<p class="vazio">—</p>'}
     </div>`;
   }).join("");
@@ -282,20 +328,102 @@ const formCard = $("#form-card");
 let edicao = null; // { tipo, id | null, cor }
 
 function linhaItem(tipo, item = {}) {
+  if (tipo === "refeicao") return linhaIngrediente(item);
   const div = document.createElement("div");
   div.className = "item-editor";
-  div.innerHTML = tipo === "treino"
-    ? `<input type="checkbox" data-campo="feito" ${item.feito ? "checked" : ""} title="Concluído">
+  div.innerHTML = `<input type="checkbox" data-campo="feito" ${item.feito ? "checked" : ""} title="Concluído">
        <input data-campo="nome" placeholder="Exercício" value="${esc(item.nome)}" class="cresce">
        <input data-campo="series" type="number" min="0" placeholder="Séries" value="${esc(item.series)}" class="curto">
        <input data-campo="repeticoes" placeholder="Reps" value="${esc(item.repeticoes)}" class="curto">
        <input data-campo="carga" type="number" min="0" step="0.5" placeholder="kg" value="${esc(item.carga)}" class="curto">
-       <button type="button" class="icone" title="Remover">✕</button>`
-    : `<input type="checkbox" data-campo="feito" ${item.feito ? "checked" : ""} title="Preparado/comprado">
-       <input data-campo="texto" placeholder="Ingrediente ou etapa (ex.: 200 g de frango)" value="${esc(item.texto)}" class="cresce">
        <button type="button" class="icone" title="Remover">✕</button>`;
   div.querySelector("button").onclick = () => div.remove();
   return div;
+}
+
+// ---- Ingrediente de refeição: alimento do catálogo ou "Outro" ----
+function opcoesAlimentos(selecionado) {
+  const categorias = [...new Set(estado.alimentos.map((a) => a.categoria))];
+  return `<option value="">Escolha um alimento…</option>` +
+    categorias.map((cat) => `<optgroup label="${esc(cat)}">${estado.alimentos
+      .filter((a) => a.categoria === cat)
+      .map((a) => `<option value="${a.id}" ${String(a.id) === String(selecionado) ? "selected" : ""}>${esc(a.nome)}</option>`)
+      .join("")}</optgroup>`).join("") +
+    `<option value="outro" ${selecionado === "outro" ? "selected" : ""}>➕ Outro (informar valores)</option>`;
+}
+
+function linhaIngrediente(item) {
+  const doCatalogo = item.alimentoId != null && estado.alimentosPorId[item.alimentoId];
+  const selecionado = doCatalogo ? item.alimentoId : item.texto ? "outro" : "";
+  const div = document.createElement("div");
+  div.className = "item-editor item-refeicao";
+  div.innerHTML = `
+    <div class="linha-item">
+      <input type="checkbox" data-campo="feito" ${item.feito ? "checked" : ""} title="Preparado/comprado">
+      <select data-campo="alimento" class="cresce">${opcoesAlimentos(selecionado)}</select>
+      <input data-campo="quantidade" type="number" min="0" step="any" placeholder="qtd" value="${esc(item.quantidade)}" class="curto">
+      <span class="unidade">g</span>
+      <button type="button" class="icone" data-remover title="Remover">✕</button>
+    </div>
+    <div class="outro-campos" hidden>
+      <input data-campo="texto" placeholder="Nome do ingrediente (ex.: molho caseiro)" value="${esc(doCatalogo ? "" : item.texto)}">
+      <p class="ajuda">Valores para a quantidade usada:</p>
+      <div class="grade-nutri">${NUTRIENTES.map((n) => `<label>${n.rotulo} (${n.un})
+        <input type="number" min="0" step="any" data-nutri="${n.k}" value="${doCatalogo ? "" : esc(item.nutrientes?.[n.k] || "")}"></label>`).join("")}
+      </div>
+    </div>
+    <div class="nutri-preview"></div>`;
+
+  const select = div.querySelector('[data-campo="alimento"]');
+  const qtd = div.querySelector('[data-campo="quantidade"]');
+  select.addEventListener("change", () => {
+    const alimento = estado.alimentosPorId[select.value];
+    if (alimento) qtd.value = alimento.porcao; // porção sugerida ao trocar de alimento
+    atualizarIngrediente(div);
+  });
+  div.addEventListener("input", () => atualizarIngrediente(div));
+  div.querySelector("[data-remover]").onclick = () => {
+    div.remove();
+    atualizarTotaisEditor();
+  };
+  atualizarIngrediente(div, false);
+  return div;
+}
+
+/** Nutrientes do ingrediente (prévia local; o cálculo oficial é feito pela API Python). */
+function nutrientesDaLinha(div) {
+  const sel = div.querySelector('[data-campo="alimento"]').value;
+  const alimento = estado.alimentosPorId[sel];
+  if (alimento) {
+    const qtd = Number(div.querySelector('[data-campo="quantidade"]').value) || 0;
+    return Object.fromEntries(NUTRIENTES.map((n) => [n.k, (alimento.por100[n.k] * qtd) / 100]));
+  }
+  if (sel === "outro") {
+    return Object.fromEntries(NUTRIENTES.map((n) => [n.k, Number(div.querySelector(`[data-nutri="${n.k}"]`).value) || 0]));
+  }
+  return null;
+}
+
+function atualizarIngrediente(div, recalcularTotais = true) {
+  const sel = div.querySelector('[data-campo="alimento"]').value;
+  const alimento = estado.alimentosPorId[sel];
+  div.querySelector(".outro-campos").hidden = sel !== "outro";
+  div.querySelector(".unidade").textContent = alimento?.unidade || "g";
+
+  const preview = div.querySelector(".nutri-preview");
+  const nutr = nutrientesDaLinha(div);
+  preview.innerHTML = alimento
+    ? `<small class="ajuda">Porção sugerida: ${esc(alimento.porcaoDescricao)} (${alimento.porcao} ${alimento.unidade})</small>${htmlMacros(nutr, "macros macros-mini")}`
+    : "";
+  if (recalcularTotais) atualizarTotaisEditor();
+}
+
+function atualizarTotaisEditor() {
+  const caixa = $("#totais-editor");
+  if (!edicao || edicao.tipo !== "refeicao") return (caixa.innerHTML = "");
+  const linhas = [...document.querySelectorAll("#lista-itens .item-refeicao")];
+  const total = somaNutrientes(linhas.map(nutrientesDaLinha).filter(Boolean));
+  caixa.innerHTML = `<span>Total da refeição</span>${htmlMacros(total)}`;
 }
 
 function abrirEditor(tipo, card = null) {
@@ -317,14 +445,14 @@ function abrirEditor(tipo, card = null) {
     formCard.duracaoMin.value = card?.duracaoMin ?? "";
   } else {
     formCard.tipo.value = card?.tipo ?? "almoco";
-    formCard.calorias.value = card?.calorias || "";
-    formCard.proteinas.value = card?.proteinas || "";
+    if (!estado.alimentos.length) toast("Catálogo de alimentos indisponível (API Python). Use \"Outro\".", true);
   }
 
   const lista = $("#lista-itens");
   lista.innerHTML = "";
   const itens = (ehTreino ? card?.exercicios : card?.itens) ?? [];
   (itens.length ? itens : [{}]).forEach((it) => lista.appendChild(linhaItem(tipo, it)));
+  atualizarTotaisEditor();
 
   desenharSeletorCor();
   editor.showModal();
@@ -379,11 +507,20 @@ function lerFormulario() {
   return {
     ...base,
     tipo: f.tipo.value,
-    calorias: numeroOuNulo(f.calorias.value) ?? 0,
-    proteinas: numeroOuNulo(f.proteinas.value) ?? 0,
     itens: linhas
-      .filter((l) => campo(l, "texto").value.trim())
-      .map((l) => ({ texto: campo(l, "texto").value.trim(), feito: campo(l, "feito").checked })),
+      .map((l) => {
+        const sel = campo(l, "alimento").value;
+        const feito = campo(l, "feito").checked;
+        const quantidade = numeroOuNulo(campo(l, "quantidade").value);
+        if (sel === "outro") {
+          const nutrientes = Object.fromEntries(
+            NUTRIENTES.map((n) => [n.k, numeroOuNulo(l.querySelector(`[data-nutri="${n.k}"]`).value) ?? 0])
+          );
+          return { texto: campo(l, "texto").value.trim(), quantidade, nutrientes, feito };
+        }
+        return sel ? { alimentoId: Number(sel), quantidade, feito } : null; // linha vazia é ignorada
+      })
+      .filter(Boolean),
   };
 }
 
