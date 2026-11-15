@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FatOutFitIn | Mural</title>
+    <link rel="stylesheet" href="./css/styles.css">
+</head>
+<body class="pagina-mural">
+
+    <header class="topo">
+        <div class="marca">🔥 <span>FatOutFitIn</span></div>
+        <input id="busca" type="search" placeholder="Pesquisar cards...">
+        <div class="status-apis">
+            <span id="status-python" class="status" title="API Python - porta 5000">● Python</span>
+            <span id="status-java" class="status" title="API Java - porta 8080">● Java</span>
+        </div>
+        <div class="usuario">
+            <span id="nome-usuario"></span>
+            <button id="btn-sair" class="btn-texto">Sair</button>
+        </div>
+    </header>
+
+    <section class="barra">
+        <div class="grupo-chips" id="filtro-tipo">
+            <button class="chip ativo" data-tipo="todos">Tudo</button>
+            <button class="chip" data-tipo="treino">🏋️ Treinos</button>
+            <button class="chip" data-tipo="refeicao">🍽️ Refeições</button>
+        </div>
+        <div class="grupo-chips" id="filtro-dia"></div>
+        <div class="grupo-chips">
+            <button class="chip ativo" data-visao="mural">Mural</button>
+            <button class="chip" data-visao="semana">Semana</button>
+        </div>
+    </section>
+
+    <section class="novo-card">
+        <button id="novo-treino" class="btn-novo treino">+ Novo treino <small>API Java</small></button>
+        <button id="nova-refeicao" class="btn-novo refeicao">+ Nova refeição <small>API Python</small></button>
+    </section>
+
+    <section id="resumo" class="resumo"></section>
+
+    <main id="conteudo">
+        <section id="visao-mural">
+            <h3 class="secao-titulo" id="titulo-fixados" hidden>📌 Fixados</h3>
+            <div id="mural-fixados" class="mural"></div>
+            <h3 class="secao-titulo" id="titulo-outros" hidden>Outros</h3>
+            <div id="mural" class="mural"></div>
+            <p id="vazio" class="vazio" hidden>Nenhum card por aqui. Crie um treino ou uma refeição!</p>
+        </section>
+        <section id="visao-semana" class="semana" hidden></section>
+    </main>
+
+    <!-- Editor de card -->
+    <dialog id="editor">
+        <form id="form-card" method="dialog">
+            <h2 id="editor-titulo">Novo card</h2>
+
+            <input name="titulo" class="input-titulo" placeholder="Título" maxlength="80" required>
+
+            <div class="linha">
+                <label>Dia
+                    <select name="dia"></select>
+                </label>
+                <label class="so-treino">Grupo muscular
+                    <input name="grupoMuscular" placeholder="Ex.: Peito e tríceps">
+                </label>
+                <label class="so-treino">Duração (min)
+                    <input name="duracaoMin" type="number" min="0" max="600">
+                </label>
+                <label class="so-refeicao">Tipo
+                    <select name="tipo">
+                        <option value="cafe">Café da manhã</option>
+                        <option value="almoco">Almoço</option>
+                        <option value="lanche">Lanche</option>
+                        <option value="jantar">Jantar</option>
+                        <option value="pre-treino">Pré-treino</option>
+                        <option value="pos-treino">Pós-treino</option>
+                        <option value="ceia">Ceia</option>
+                    </select>
+                </label>
+                <label class="so-refeicao">Calorias (kcal)
+                    <input name="calorias" type="number" min="0">
+                </label>
+                <label class="so-refeicao">Proteínas (g)
+                    <input name="proteinas" type="number" min="0">
+                </label>
+            </div>
+
+            <h4 id="titulo-itens">Itens</h4>
+            <div id="lista-itens" class="lista-itens"></div>
+            <button type="button" id="add-item" class="btn-texto">+ Adicionar item</button>
+
+            <label>Notas
+                <textarea name="notas" rows="2" maxlength="500" placeholder="Observações, modo de preparo, dicas..."></textarea>
+            </label>
+
+            <div class="cores" id="seletor-cor"></div>
+
+            <p id="erro-editor" class="mensagem erro" role="alert"></p>
+
+            <div class="acoes-editor">
+                <span id="origem-api" class="selo"></span>
+                <button type="button" id="cancelar" class="btn-texto">Cancelar</button>
+                <button type="submit" class="btn-primario">Salvar</button>
+            </div>
+        </form>
+    </dialog>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script src="./js/api.js"></script>
+    <script src="./js/mural.js"></script>
+</body>
+</html>

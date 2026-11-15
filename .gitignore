@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+api-python/*.db
+
+# Java
+api-java/target/
+api-java/data/
+*.class
+
+# Node / editores / SO
+node_modules/
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+.env

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FatOutFitIn | Acesso</title>
+    <link rel="stylesheet" href="./css/styles.css">
+</head>
+<body class="pagina-login">
+    <h1 class="logo-login">Bem-vindo ao <span>FatOutFitIn</span></h1>
+    <p class="slogan">Seu mural de treinos e refeições da semana</p>
+
+    <main class="caixa-login">
+        <div class="abas">
+            <button type="button" class="aba ativa" data-modo="login">Entrar</button>
+            <button type="button" class="aba" data-modo="cadastro">Criar conta</button>
+        </div>
+
+        <form id="form-acesso" novalidate>
+            <label class="campo-nome" hidden>
+                Nome
+                <input name="nome" autocomplete="name" placeholder="Seu nome">
+            </label>
+            <label>
+                E-mail
+                <input name="email" type="email" autocomplete="email" placeholder="Digite seu e-mail" autofocus>
+            </label>
+            <label>
+                Senha
+                <input name="senha" type="password" autocomplete="current-password" placeholder="Digite sua senha">
+            </label>
+            <p id="mensagem" class="mensagem" role="alert"></p>
+            <button type="submit" id="login">Entrar</button>
+        </form>
+        <p class="dica">Login e cadastro são feitos pela <b>API Python</b> (porta 5000).</p>
+    </main>
+
+    <script src="./js/api.js"></script>
+    <script src="./js/login.js"></script>
+</body>
+</html>
