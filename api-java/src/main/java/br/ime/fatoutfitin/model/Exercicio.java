@@ -8,6 +8,7 @@ public class Exercicio {
     private String repeticoes;
     private Double carga;
     private boolean feito;
+    private String tecnica = "";
 
     public Exercicio() {
     }
@@ -26,4 +27,6 @@ public class Exercicio {
 
     public boolean isFeito() { return feito; }
     public void setFeito(boolean feito) { this.feito = feito; }
+    public String getTecnica() { return tecnica; }
+    public void setTecnica(String tecnica) { this.tecnica = tecnica == null ? "" : tecnica; }
 }

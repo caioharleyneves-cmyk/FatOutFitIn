@@ -4,6 +4,21 @@ Mural de notas no estilo Google Keep para organizar **rotinas de academia** e **
 
 Cada card representa um treino ou uma refeição de um dia da semana, com checklist (exercícios / ingredientes), cor, fixação no topo, notas e progresso. A plataforma também mostra um resumo da semana (treinos, séries, dias de descanso, calorias e proteínas).
 
+## Planejamento mais simples
+
+- Login e mural com visual claro e responsivo, sem o GIF de fundo.
+- Um botão abre os sete dias em balões, tanto no filtro do mural quanto no editor.
+- Musculação: selecione vários grupos musculares e exercícios conhecidos. Grupos e exercícios personalizados ficam salvos na conta.
+- Cada exercício pode registrar uma técnica avançada opcional, como Drop set ou Rest-pause, ou uma técnica digitada pelo usuário.
+- Cardio: cards próprios com atividade, duração, intensidade, distância opcional e conclusão.
+
+O catálogo pessoal fica em `api-java/data/catalogo-personalizado.json`, separado por
+usuário. Os cards de cardio são armazenados junto aos treinos no arquivo já
+existente. Treinos anteriores continuam compatíveis com a nova versão.
+
+Se uma versão antiga estiver aberta, pressione Enter na janela do iniciador para
+encerrá-la e abra `INICIAR.cmd` novamente. A Java será recompilada automaticamente.
+
 ## 👥 Integrantes
 
 | Nome | Responsabilidade |
@@ -16,8 +31,8 @@ Cada card representa um treino ou uma refeição de um dia da semana, com checkl
 
 | Parte | Tecnologias | Porta |
 |-------|-------------|-------|
-| `api-python/` | Python 3.10+, Flask, Flask-CORS, SQLite | **5000** |
-| `api-java/` | Java 17+, Spring Boot 3.5 (Maven Wrapper incluso) | **8080** |
+| `api-python/` | Python 3.10+, Flask, Flask-CORS, PyJWT, SQLite | **5000** |
+| `api-java/` | Java 17+, Spring Boot 3.5, java-jwt (Maven Wrapper incluso) | **8080** |
 | `frontend/` | HTML, CSS e JavaScript puro (fetch API) | **5500** |
 
 ### Quem faz o quê
@@ -32,10 +47,43 @@ Cada card representa um treino ou uma refeição de um dia da semana, com checkl
 | Criar / editar / excluir / fixar / colorir **treinos** | ☕ Java |
 | Marcar exercícios como concluídos | ☕ Java |
 | Resumo de treinos (séries, minutos, progresso, descanso) | ☕ Java |
+| Cards de cardio, intensidade, distância e conclusão | ☕ Java |
+| Catálogo de exercícios, grupos e opções personalizadas da conta | ☕ Java |
 
-O usuário logado é identificado nas duas APIs pelo cabeçalho `X-Usuario-Id` (o `id` devolvido pelo login da API Python).
+O login devolve um token de sessão JWT com duração de 8 horas. O front-end envia
+`Authorization: Bearer <token>` nas duas APIs. Cada API verifica a assinatura,
+o emissor, o público e a validade do token; o ID do usuário vem da sessão verificada.
+Enviar somente `X-Usuario-Id` não autentica uma requisição.
+
+Para executar localmente, a primeira API iniciada cria automaticamente a chave
+em `.local/auth-secret`, na raiz do projeto; a outra usa a mesma chave. Esse arquivo
+é privado e ignorado pelo Git. Inicie cada API a partir de sua pasta, como abaixo.
+Se as APIs estiverem em máquinas diferentes, configure `FOFI_AUTH_SECRET` com o
+mesmo segredo aleatório de pelo menos 32 bytes nos dois ambientes.
+Ao atualizar de uma versão anterior, faça login novamente.
 
 ## ▶️ Como executar
+
+### Forma mais fácil no Windows
+
+1. Instale **Python 3.10+** e **JDK 17+**, caso ainda não estejam instalados.
+2. Extraia o ZIP inteiro para uma pasta.
+3. Dê dois cliques em **`INICIAR.cmd`**, na raiz do projeto.
+4. Aguarde: as dependências são instaladas e o navegador abre automaticamente.
+5. Para encerrar as duas APIs e a página, pressione **Enter** na janela do iniciador.
+
+O iniciador escolhe portas livres e configura o front-end automaticamente. Não
+é preciso editar endereços, ativar o ambiente virtual ou abrir três terminais.
+Na primeira execução é necessário ter internet; nas seguintes, o ambiente e a
+compilação são reaproveitados. O guia completo está em **GUIA-PARA-RODAR.md**.
+
+Também é possível iniciar por um terminal na raiz do projeto:
+
+```powershell
+python iniciar.py
+```
+
+### Execução manual (alternativa)
 
 Abra **três terminais**, um para cada parte. Os comandos abaixo partem da raiz do repositório.
 
@@ -75,6 +123,10 @@ cd api-java
 A API sobe em `http://localhost:8080`. Os treinos ficam salvos em `api-java/data/treinos.json` (criado automaticamente).
 Teste: `http://localhost:8080/api/health`.
 
+Se a porta 8080 já estiver em uso, inicie com
+`.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--server.port=8081"`
+e ajuste `API_JAVA` em `frontend/js/api.js` para `http://localhost:8081/api`.
+
 ### 3. Front-end (porta 5500)
 
 ```bash
@@ -97,7 +149,7 @@ Todas as respostas são JSON. Erros seguem o formato `{"erro": "mensagem", "stat
 |--------|------|-----------|
 | GET | `/api/health` | Verifica se a API está no ar |
 | POST | `/api/usuarios` | Cadastra usuário `{nome, email, senha}` |
-| POST | `/api/login` | Login `{email, senha}` → `{id, nome, email}` |
+| POST | `/api/login` | Login `{email, senha}` → `{id, nome, email, token}` |
 | GET | `/api/alimentos` | Catálogo de alimentos com nutrientes por 100 g/ml (filtros `?busca=frango`, `?categoria=Frutas`) |
 | GET | `/api/alimentos/{id}` | Detalhe de um alimento; com `?quantidade=150` calcula os nutrientes da porção |
 | GET | `/api/refeicoes` | Lista as refeições do usuário (filtro opcional `?dia=seg`) |
@@ -149,6 +201,14 @@ Valores aceitos — `dia`: `seg, ter, qua, qui, sex, sab, dom` · `tipo`: `cafe,
 | PATCH | `/api/treinos/{id}/exercicios/{indice}` | Marca/desmarca um exercício como concluído |
 | DELETE | `/api/treinos/{id}` | Exclui um card de treino |
 | GET | `/api/treinos/resumo` | Treinos, séries, minutos, grupos musculares e progresso por dia |
+| GET | `/api/catalogo-treinos` | Grupos, exercícios, técnicas, atividades de cardio e opções pessoais |
+| POST | `/api/catalogo-treinos/personalizados` | Salva `{tipo: "grupo" ou "exercicio", nome}` para o usuário |
+| GET | `/api/cardios` | Lista cardios; aceita filtro `?dia=seg` |
+| GET | `/api/cardios/{id}` | Consulta um cardio da conta |
+| POST | `/api/cardios` | Cria cardio |
+| PUT | `/api/cardios/{id}` | Edita cardio |
+| PATCH | `/api/cardios/{id}/concluir` | Alterna a conclusão do cardio |
+| DELETE | `/api/cardios/{id}` | Exclui cardio |
 
 Exemplo de corpo de treino:
 
@@ -156,12 +216,12 @@ Exemplo de corpo de treino:
 {
   "titulo": "Treino A",
   "dia": "seg",
-  "grupoMuscular": "Peito e tríceps",
+  "gruposMusculares": ["Peito", "Tríceps"],
   "duracaoMin": 60,
   "cor": "laranja",
   "fixado": true,
   "exercicios": [
-    { "nome": "Supino reto", "series": 4, "repeticoes": "8-10", "carga": 40, "feito": false }
+    { "nome": "Supino reto", "series": 4, "repeticoes": "8-10", "carga": 40, "feito": false, "tecnica": "Drop set" }
   ],
   "notas": "Descanso de 90s"
 }
@@ -170,14 +230,57 @@ Exemplo de corpo de treino:
 Exemplo com `curl`:
 
 ```bash
-curl -H "X-Usuario-Id: 1" http://localhost:8080/api/treinos/resumo
-curl -H "X-Usuario-Id: 1" http://localhost:5000/api/refeicoes/resumo
+curl -H "Authorization: Bearer SEU_TOKEN" http://localhost:8080/api/treinos/resumo
+curl -H "Authorization: Bearer SEU_TOKEN" http://localhost:5000/api/refeicoes/resumo
 ```
+
+## Testes de integração
+
+Com as duas APIs rodando, execute da raiz do repositório:
+
+```powershell
+api-python\.venv\Scripts\python.exe tests/test_api.py
+# Se a API Java estiver na porta alternativa:
+api-python\.venv\Scripts\python.exe tests/test_api.py --java-port 8081
+# Catálogos, grupos, técnicas e cardio (use portas exibidas pelo iniciador):
+api-python\.venv\Scripts\python.exe tests/test_catalogo_cardio.py --java-port 8081 --fixture teste-persistencia.json
+# Reinicie as APIs e confirme que os registros personalizados foram preservados:
+api-python\.venv\Scripts\python.exe tests/test_catalogo_cardio.py --java-port 8081 --fixture teste-persistencia.json --verify-persistence
+```
+
+Os testes criam contas e cards fictícios no banco local, verificam CRUD, cálculo
+nutricional, isolamento entre contas, validações e sessões inválidas/expiradas.
+Os cards válidos são excluídos ao final; as contas de teste ficam no banco.
+
+A suíte adicional de catálogo/cardio deixa registros fictícios para permitir a
+verificação após reiniciar as APIs. Execute em dados de teste. Ambas as suítes
+aceitam `--python-port` e `--java-port` quando as portas padrão estiverem ocupadas.
+
+### Exemplo de cardio
+
+```json
+{
+  "titulo": "Caminhada no parque",
+  "dia": "seg",
+  "tipoCardio": "Caminhada",
+  "duracaoMin": 30,
+  "intensidade": "leve",
+  "distanciaKm": 3,
+  "concluido": false,
+  "notas": "Percurso ao ar livre"
+}
+```
+
+Todos os endpoints de catálogo e cardio exigem a mesma sessão assinada usada nos
+treinos. As opções pessoais de uma conta não aparecem no catálogo de outra.
 
 ## 📁 Estrutura
 
 ```
 FatOutFitIn/
+├── INICIAR.cmd          # dois cliques no Windows
+├── iniciar.py           # instalação, portas e inicialização automática
+├── GUIA-PARA-RODAR.md   # guia passo a passo e solução de problemas
 ├── api-python/          # Flask: usuários, catálogo de alimentos e refeições
 │   ├── app.py
 │   ├── alimentos.py     # catálogo nutricional
@@ -199,6 +302,5 @@ FatOutFitIn/
 │   ├── js/api.js        # chamadas às duas APIs
 │   ├── js/login.js
 │   ├── js/mural.js
-│   └── img/
 └── README.md
 ```

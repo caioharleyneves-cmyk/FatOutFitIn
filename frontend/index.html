@@ -1,41 +1,31 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FatOutFitIn | Acesso</title>
-    <link rel="stylesheet" href="./css/styles.css">
-</head>
-<body class="pagina-login">
-    <h1 class="logo-login">Bem-vindo ao <span>FatOutFitIn</span></h1>
-    <p class="slogan">Seu mural de treinos e refeições da semana</p>
-
-    <main class="caixa-login">
-        <div class="abas">
-            <button type="button" class="aba ativa" data-modo="login">Entrar</button>
-            <button type="button" class="aba" data-modo="cadastro">Criar conta</button>
-        </div>
-
-        <form id="form-acesso" novalidate>
-            <label class="campo-nome" hidden>
-                Nome
-                <input name="nome" autocomplete="name" placeholder="Seu nome">
-            </label>
-            <label>
-                E-mail
-                <input name="email" type="email" autocomplete="email" placeholder="Digite seu e-mail" autofocus>
-            </label>
-            <label>
-                Senha
-                <input name="senha" type="password" autocomplete="current-password" placeholder="Digite sua senha">
-            </label>
-            <p id="mensagem" class="mensagem" role="alert"></p>
-            <button type="submit" id="login">Entrar</button>
-        </form>
-        <p class="dica">Login e cadastro são feitos pela <b>API Python</b> (porta 5000).</p>
-    </main>
-
-    <script src="./js/api.js"></script>
-    <script src="./js/login.js"></script>
-</body>
-</html>
+<!doctype html>
+<html lang="pt-BR"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f4f6f3"><title>FatOutFitIn · Sua rotina, no seu ritmo</title>
+  <link rel="stylesheet" href="./css/styles.css">
+</head><body class="pagina-login">
+  <div class="login-layout">
+    <section class="login-apresentacao" aria-label="Sobre o FatOutFitIn">
+      <a class="marca" href="./index.html"><span class="brand-symbol" aria-hidden="true">f.</span>FatOut<span>FitIn</span></a>
+      <div class="intro-copy"><span class="intro-tag">Um espaço para a sua rotina</span>
+        <h1>Pequenos passos.<br><em>Uma semana melhor.</em></h1>
+        <p>Treinos, cardio e refeições juntos. Planeje com calma, acompanhe sua evolução e encontre o seu ritmo.</p>
+      </div>
+      <div class="routine-art" aria-hidden="true">
+        <div class="art-note note-training"><span class="note-kicker">🏋️ SEGUNDA</span><b>Hora de se movimentar</b><span>Peito + tríceps</span><div class="art-check"><i>✓</i> Supino reto <small>3 × 12</small></div><div class="art-check"><i>✓</i> Tríceps na polia <small>3 × 10</small></div></div>
+        <div class="art-note note-cardio"><span class="art-icon">🏃</span><div><b>Um tempo para você</b><span>Caminhada · 30 minutos</span></div></div>
+        <div class="art-decoration deco-one"></div><div class="art-decoration deco-two"></div>
+      </div><p class="intro-footer">Organização que cabe na sua vida.</p>
+    </section>
+    <main class="login-form-side"><div class="caixa-login">
+      <div class="login-heading"><span class="intro-tag">Vamos começar</span><h2>Sua rotina te espera.</h2><p>Entre para continuar de onde parou.</p></div>
+      <div class="abas" role="group" aria-label="Acessar ou criar conta"><button type="button" class="aba ativa" data-modo="login">Entrar</button><button type="button" class="aba" data-modo="cadastro">Criar conta</button></div>
+      <form id="form-acesso" novalidate>
+        <label class="campo-nome" hidden>Seu nome<input name="nome" autocomplete="name" placeholder="Como podemos te chamar?" maxlength="80"></label>
+        <label>E-mail<input name="email" type="email" autocomplete="email" placeholder="voce@exemplo.com" autofocus></label>
+        <label>Senha<input name="senha" type="password" autocomplete="current-password" placeholder="Sua senha"></label>
+        <p id="mensagem" class="mensagem" role="alert"></p><button type="submit" id="login" class="btn-primario">Entrar</button>
+      </form><p class="login-footnote">Seu planejamento de treinos e alimentação, em um só lugar.</p>
+    </div><small class="login-copyright">FatOutFitIn · Um dia de cada vez.</small></main>
+  </div><script src="./js/config.js"></script><script src="./js/api.js"></script><script src="./js/login.js"></script>
+</body></html>

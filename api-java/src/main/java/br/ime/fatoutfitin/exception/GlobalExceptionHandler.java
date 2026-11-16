@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -37,6 +38,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, Object>> jsonInvalido(HttpMessageNotReadableException e) {
         return resposta(HttpStatus.BAD_REQUEST, "O corpo da requisição deve ser um JSON válido com os tipos corretos.");
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> tipoConteudo(HttpMediaTypeNotSupportedException e) {
+        return resposta(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Use Content-Type: application/json.");
     }
 
     @ExceptionHandler(MissingRequestHeaderException.class)

@@ -15,6 +15,9 @@ document.querySelectorAll(".aba").forEach((aba) => {
     botao.textContent = modo === "login" ? "Entrar" : "Criar conta";
     form.senha.autocomplete = modo === "login" ? "current-password" : "new-password";
     mensagem.textContent = "";
+    document.querySelector(".login-heading h2").textContent = modo === "login" ? "Sua rotina te espera." : "Comece no seu ritmo.";
+    document.querySelector(".login-heading p").textContent = modo === "login" ? "Entre para continuar de onde parou." : "Crie sua conta e organize sua primeira semana.";
+    if (modo === "cadastro") form.nome.focus();
   });
 });
 

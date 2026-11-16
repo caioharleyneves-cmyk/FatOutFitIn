@@ -19,9 +19,15 @@
 
     <properties>
         <java.version>17</java.version>
+        <fofi.build.directory>${project.basedir}/target</fofi.build.directory>
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>com.auth0</groupId>
+            <artifactId>java-jwt</artifactId>
+            <version>4.6.2</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -29,6 +35,7 @@
     </dependencies>
 
     <build>
+        <directory>${fofi.build.directory}</directory>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

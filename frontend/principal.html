@@ -1,112 +1,47 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FatOutFitIn | Mural</title>
-    <link rel="stylesheet" href="./css/styles.css">
-</head>
-<body class="pagina-mural">
-
-    <header class="topo">
-        <div class="marca">🔥 <span>FatOutFitIn</span></div>
-        <input id="busca" type="search" placeholder="Pesquisar cards...">
-        <div class="status-apis">
-            <span id="status-python" class="status" title="API Python - porta 5000">● Python</span>
-            <span id="status-java" class="status" title="API Java - porta 8080">● Java</span>
-        </div>
-        <div class="usuario">
-            <span id="nome-usuario"></span>
-            <button id="btn-sair" class="btn-texto">Sair</button>
-        </div>
-    </header>
-
-    <section class="barra">
-        <div class="grupo-chips" id="filtro-tipo">
-            <button class="chip ativo" data-tipo="todos">Tudo</button>
-            <button class="chip" data-tipo="treino">🏋️ Treinos</button>
-            <button class="chip" data-tipo="refeicao">🍽️ Refeições</button>
-        </div>
-        <div class="grupo-chips" id="filtro-dia"></div>
-        <div class="grupo-chips">
-            <button class="chip ativo" data-visao="mural">Mural</button>
-            <button class="chip" data-visao="semana">Semana</button>
-        </div>
-    </section>
-
-    <section class="novo-card">
-        <button id="novo-treino" class="btn-novo treino">+ Novo treino <small>API Java</small></button>
-        <button id="nova-refeicao" class="btn-novo refeicao">+ Nova refeição <small>API Python</small></button>
-    </section>
-
-    <section id="resumo" class="resumo"></section>
-
-    <main id="conteudo">
-        <section id="visao-mural">
-            <h3 class="secao-titulo" id="titulo-fixados" hidden>📌 Fixados</h3>
-            <div id="mural-fixados" class="mural"></div>
-            <h3 class="secao-titulo" id="titulo-outros" hidden>Outros</h3>
-            <div id="mural" class="mural"></div>
-            <p id="vazio" class="vazio" hidden>Nenhum card por aqui. Crie um treino ou uma refeição!</p>
-        </section>
-        <section id="visao-semana" class="semana" hidden></section>
-    </main>
-
-    <!-- Editor de card -->
-    <dialog id="editor">
-        <form id="form-card" method="dialog">
-            <h2 id="editor-titulo">Novo card</h2>
-
-            <input name="titulo" class="input-titulo" placeholder="Título" maxlength="80" required>
-
-            <div class="linha">
-                <label>Dia
-                    <select name="dia"></select>
-                </label>
-                <label class="so-treino">Grupo muscular
-                    <input name="grupoMuscular" placeholder="Ex.: Peito e tríceps">
-                </label>
-                <label class="so-treino">Duração (min)
-                    <input name="duracaoMin" type="number" min="0" max="600">
-                </label>
-                <label class="so-refeicao">Tipo
-                    <select name="tipo">
-                        <option value="cafe">Café da manhã</option>
-                        <option value="almoco">Almoço</option>
-                        <option value="lanche">Lanche</option>
-                        <option value="jantar">Jantar</option>
-                        <option value="pre-treino">Pré-treino</option>
-                        <option value="pos-treino">Pós-treino</option>
-                        <option value="ceia">Ceia</option>
-                    </select>
-                </label>
-            </div>
-
-            <h4 id="titulo-itens">Itens</h4>
-            <p class="so-refeicao ajuda">Escolha um alimento do catálogo (valores por porção calculados pela API Python) ou "Outro" para informar os valores manualmente.</p>
-            <div id="lista-itens" class="lista-itens"></div>
-            <button type="button" id="add-item" class="btn-texto">+ Adicionar item</button>
-            <div id="totais-editor" class="so-refeicao totais-editor"></div>
-
-            <label>Notas
-                <textarea name="notas" rows="2" maxlength="500" placeholder="Observações, modo de preparo, dicas..."></textarea>
-            </label>
-
-            <div class="cores" id="seletor-cor"></div>
-
-            <p id="erro-editor" class="mensagem erro" role="alert"></p>
-
-            <div class="acoes-editor">
-                <span id="origem-api" class="selo"></span>
-                <button type="button" id="cancelar" class="btn-texto">Cancelar</button>
-                <button type="submit" class="btn-primario">Salvar</button>
-            </div>
-        </form>
-    </dialog>
-
-    <div id="toast" class="toast" hidden></div>
-
-    <script src="./js/api.js"></script>
-    <script src="./js/mural.js"></script>
-</body>
-</html>
+<!doctype html>
+<html lang="pt-BR"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f4f6f3"><title>FatOutFitIn · Meu planejamento</title><link rel="stylesheet" href="./css/styles.css">
+</head><body class="pagina-mural">
+  <aside class="sidebar">
+    <a class="marca" href="./principal.html"><span class="brand-symbol" aria-hidden="true">f.</span>FatOut<span>FitIn</span></a>
+    <p class="nav-caption">Seu espaço</p><nav id="filtro-tipo" aria-label="Filtrar planejamento">
+      <button class="nav-item ativo" data-tipo="todos"><span aria-hidden="true">▦</span> Meu planejamento</button>
+      <button class="nav-item" data-tipo="treino"><span aria-hidden="true">🏋️</span> Musculação</button>
+      <button class="nav-item" data-tipo="cardio"><span aria-hidden="true">🏃</span> Cardio</button>
+      <button class="nav-item" data-tipo="refeicao"><span aria-hidden="true">🍽️</span> Refeições</button>
+    </nav><div class="sidebar-note"><span class="small-sun" aria-hidden="true">✳</span><strong>O seu ritmo conta.</strong><p>Uma rotina consistente começa com o próximo passo.</p></div>
+    <details class="diagnostico"><summary>Conexão dos serviços</summary><div class="status-apis"><span id="status-python" class="status">Python</span><span id="status-java" class="status">Java</span></div></details>
+    <button id="btn-sair" class="nav-item sair"><span aria-hidden="true">⇥</span> Sair da conta</button>
+  </aside>
+  <div class="app-main"><header class="topo">
+    <div class="mobile-brand">FatOutFitIn</div><span class="breadcrumb">Meu espaço <span>/</span> Planejamento</span>
+    <label class="search-wrap"><span aria-hidden="true">⌕</span><input id="busca" type="search" placeholder="Buscar no seu mural" aria-label="Buscar no mural"></label>
+    <div class="usuario"><span id="avatar" class="avatar" aria-hidden="true"></span><span id="nome-usuario"></span></div>
+  </header><main class="workspace">
+    <section class="page-heading"><div><p id="saudacao" class="greeting"></p><h1>Sua semana, no seu ritmo.</h1><p class="page-description">Um lugar para cuidar do que faz bem a você.</p></div>
+      <div class="novo-card"><button id="novo-treino" class="btn-primario">+ Novo treino</button><button id="novo-cardio" class="btn-secundario">+ Cardio</button><button id="nova-refeicao" class="btn-secundario">+ Refeição</button></div>
+    </section><section id="resumo" class="resumo" aria-label="Resumo da semana"></section>
+    <section class="barra" aria-label="Visualização e dias"><div class="toolbar-title"><span class="section-dot"></span><h2 id="titulo-mural">Meu mural</h2><span id="contagem-cards" class="count-badge">0</span></div>
+      <div class="toolbar-actions"><details id="filtro-dia" class="day-picker"><summary><span aria-hidden="true">▦</span><span id="dia-filtro-label">Semana toda</span><span class="chevron">⌄</span></summary><div class="day-popover"><span class="popover-label">Qual dia você quer ver?</span><div id="dias-filtro" class="day-balloons"></div><button type="button" data-dia-filtro="todos" class="all-days">Ver a semana toda</button></div></details>
+        <div id="filtro-visao" class="view-switch" role="group" aria-label="Visualização"><button class="ativo" data-visao="mural">Mural</button><button data-visao="semana">Semana</button></div></div>
+    </section><div id="erro-carregamento" class="load-error" hidden role="alert"></div>
+    <div id="conteudo"><section id="visao-mural"><h3 class="secao-titulo" id="titulo-fixados" hidden>Fixados para você</h3><div id="mural-fixados" class="mural"></div><h3 class="secao-titulo" id="titulo-outros" hidden>Seu planejamento</h3><div id="mural" class="mural"></div><div id="vazio" class="vazio" hidden></div></section><section id="visao-semana" class="semana" hidden aria-label="Planejamento por dia"></section></div>
+    <footer class="workspace-footer">Um dia de cada vez. Cada passo conta.</footer>
+  </main></div>
+  <dialog id="editor" aria-labelledby="editor-titulo"><form id="form-card" novalidate>
+    <div class="editor-header"><div><span id="editor-tag" class="intro-tag">Planeje seu próximo passo</span><h2 id="editor-titulo">Novo treino</h2></div><button type="button" id="fechar-editor" class="icon-button" aria-label="Fechar editor">×</button></div>
+    <label>Título<input name="titulo" class="input-titulo" placeholder="Ex.: Treino A" maxlength="80" required></label>
+    <div class="editor-grid"><div class="field"><span class="field-label">Dia da semana</span><input name="dia" type="hidden"><details id="editor-dia" class="day-picker"><summary><span id="dia-editor-label"></span><span class="chevron">⌄</span></summary><div class="day-popover"><span class="popover-label">Escolha um dia</span><div id="dias-editor" class="day-balloons"></div></div></details></div>
+      <label class="so-atividade">Duração (min)<input name="duracaoMin" type="number" min="0" max="600" placeholder="Ex.: 45"></label>
+      <label class="so-refeicao">Refeição<select name="tipo"><option value="cafe">Café da manhã</option><option value="almoco">Almoço</option><option value="lanche">Lanche</option><option value="jantar">Jantar</option><option value="pre-treino">Pré-treino</option><option value="pos-treino">Pós-treino</option><option value="ceia">Ceia</option></select></label></div>
+    <fieldset class="so-treino grupos-field"><legend>Grupos musculares <small>Escolha quantos quiser</small></legend><div id="grupos-musculares" class="choice-pills"></div><details class="custom-add"><summary>+ Grupo personalizado</summary><div class="custom-row"><input id="nome-grupo-personalizado" aria-label="Nome do grupo personalizado" maxlength="40" placeholder="Nome do seu grupo"><button type="button" id="salvar-grupo" class="btn-secundario">Salvar grupo</button></div><small>Fica salvo na sua conta para os próximos treinos.</small></details></fieldset>
+    <div class="so-cardio cardio-fields"><div class="editor-grid"><label>Atividade<select name="tipoCardio" id="tipo-cardio"></select></label><label>Intensidade<select name="intensidade"><option value="leve">Leve</option><option value="moderada">Moderada</option><option value="intensa">Intensa</option></select></label><label>Distância (km) <small>Opcional</small><input name="distanciaKm" type="number" min="0" max="1000" step="0.01" placeholder="Ex.: 5"></label></div><label id="outra-atividade-wrap" hidden>Nome da atividade<input name="outraAtividade" maxlength="80" placeholder="Ex.: Patinação"></label><label class="check-row"><input name="concluido" type="checkbox"> Já concluí este cardio</label></div>
+    <section class="so-itens"><div class="items-heading"><h3 id="titulo-itens">Exercícios</h3><button type="button" id="add-item" class="btn-texto">+ Adicionar exercício</button></div><p class="so-refeicao ajuda">Escolha um alimento e a quantidade. Os nutrientes são calculados automaticamente.</p><div id="lista-itens" class="lista-itens"></div><div id="totais-editor" class="so-refeicao totais-editor"></div></section>
+    <label>Observações <small>Opcional</small><textarea name="notas" rows="2" maxlength="500"></textarea></label>
+    <details class="card-customization"><summary>Personalizar cor do card</summary><div class="cores" id="seletor-cor"></div></details>
+    <p id="erro-editor" class="mensagem erro" role="alert"></p>
+    <div class="acoes-editor"><span id="origem-api" class="selo"></span><button type="button" id="cancelar" class="btn-secundario">Cancelar</button><button type="submit" class="btn-primario">Salvar treino</button></div>
+  </form></dialog><div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="./js/config.js"></script><script src="./js/api.js"></script><script src="./js/mural.js"></script>
+</body></html>

@@ -11,6 +11,7 @@ Responsável por:
 Roda na porta 5000. Os dados ficam em um banco SQLite local (fatoutfitin.db).
 """
 import json
+import math
 import os
 import re
 import sqlite3
@@ -22,9 +23,12 @@ from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from alimentos import ALIMENTOS, ALIMENTOS_POR_ID, CATEGORIAS, NUTRIENTES
+from autenticacao import criar_token, validar_token
+from jwt import InvalidTokenError
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("FOFI_DB", os.path.join(BASE_DIR, "fatoutfitin.db"))
+PORTA = int(os.environ.get("FOFI_PORT", "5000"))
 
 DIAS = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"]
 TIPOS = ["cafe", "almoco", "lanche", "jantar", "pre-treino", "pos-treino", "ceia"]
@@ -145,14 +149,34 @@ def corpo_json():
 
 
 def usuario_atual():
-    """Lê o usuário logado do cabeçalho X-Usuario-Id e confere se existe."""
-    bruto = request.headers.get("X-Usuario-Id", "")
-    if not bruto.isdigit():
-        raise ApiError(401, "Cabeçalho X-Usuario-Id ausente ou inválido. Faça login.")
-    usuario = get_db().execute("SELECT id FROM usuarios WHERE id = ?", (int(bruto),)).fetchone()
+    """Usa a identidade da sessão assinada, nunca um ID informado pelo cliente."""
+    try:
+        usuario_id = validar_token(request.headers.get("Authorization", ""))
+    except InvalidTokenError:
+        raise ApiError(401, "Sessão ausente, inválida ou expirada. Faça login novamente.")
+    usuario = get_db().execute("SELECT id FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
     if usuario is None:
         raise ApiError(401, "Usuário não encontrado. Faça login novamente.")
     return usuario["id"]
+
+
+def texto(dados, campo, obrigatorio=False, limite=None):
+    valor = dados.get(campo, "")
+    if not isinstance(valor, str):
+        raise ApiError(400, f"O campo '{campo}' deve ser um texto.")
+    valor = valor.strip()
+    if obrigatorio and not valor:
+        raise ApiError(400, f"O campo '{campo}' é obrigatório.")
+    if limite is not None and len(valor) > limite:
+        raise ApiError(400, f"O campo '{campo}' deve ter no máximo {limite} caracteres.")
+    return valor
+
+
+def booleano(dados, campo):
+    valor = dados.get(campo, False)
+    if not isinstance(valor, bool):
+        raise ApiError(400, f"O campo '{campo}' deve ser booleano.")
+    return valor
 
 
 def numero(valor, campo, minimo, maximo, padrao=0.0):
@@ -171,8 +195,10 @@ def numero(valor, campo, minimo, maximo, padrao=0.0):
 
 
 def arredondar(nutriente, valor):
-    # kcal e sódio (mg) inteiros; gramas com 1 casa decimal
-    return round(valor) if nutriente in ("kcal", "sodio") else round(valor, 1)
+    # Mesma regra da prévia JS: meio para cima, por ingrediente, antes de somar.
+    escala = 1 if nutriente in ("kcal", "sodio") else 10
+    resultado = math.floor(valor * escala + 0.5)
+    return resultado if escala == 1 else resultado / escala
 
 
 def nutrientes_zerados():
@@ -195,14 +221,11 @@ def validar_item(item, posicao):
     """
     if not isinstance(item, dict):
         raise ApiError(400, f"O item {posicao} deve ser um objeto.")
-    feito = bool(item.get("feito", False))
+    feito = booleano(item, "feito")
     alimento_id = item.get("alimentoId")
 
     if alimento_id not in (None, ""):
-        try:
-            alimento = ALIMENTOS_POR_ID.get(int(alimento_id))
-        except (TypeError, ValueError):
-            alimento = None
+        alimento = ALIMENTOS_POR_ID.get(alimento_id) if type(alimento_id) is int else None
         if alimento is None:
             raise ApiError(400, f"Item {posicao}: alimento {alimento_id} não existe no catálogo.")
         quantidade = numero(item.get("quantidade"), f"itens[{posicao}].quantidade", 1, 5000,
@@ -210,17 +233,15 @@ def validar_item(item, posicao):
         return {
             "alimentoId": alimento["id"],
             "texto": alimento["nome"],
-            "quantidade": round(quantidade, 1),
+            "quantidade": quantidade,
             "unidade": alimento["unidade"],
             "feito": feito,
             "nutrientes": calcular_nutrientes(alimento, quantidade),
         }
 
-    texto = str(item.get("texto", "")).strip()
-    if not texto:
-        raise ApiError(400, f"Item {posicao}: informe um alimento do catálogo ou o nome do ingrediente.")
+    nome = texto(item, "texto", obrigatorio=True, limite=120)
     quantidade = numero(item.get("quantidade"), f"itens[{posicao}].quantidade", 0, 5000, padrao=None)
-    informados = item.get("nutrientes") or {}
+    informados = item.get("nutrientes", {})
     if not isinstance(informados, dict):
         raise ApiError(400, f"Item {posicao}: 'nutrientes' deve ser um objeto.")
     nutrientes = {
@@ -229,8 +250,8 @@ def validar_item(item, posicao):
     }
     return {
         "alimentoId": None,
-        "texto": texto[:120],
-        "quantidade": None if quantidade is None else round(quantidade, 1),
+        "texto": nome,
+        "quantidade": quantidade,
         "unidade": "g",
         "feito": feito,
         "nutrientes": nutrientes,
@@ -238,11 +259,7 @@ def validar_item(item, posicao):
 
 
 def validar_refeicao(dados):
-    titulo = str(dados.get("titulo", "")).strip()
-    if not titulo:
-        raise ApiError(400, "O campo 'titulo' é obrigatório.")
-    if len(titulo) > 80:
-        raise ApiError(400, "O 'titulo' deve ter no máximo 80 caracteres.")
+    titulo = texto(dados, "titulo", obrigatorio=True, limite=80)
 
     dia = dados.get("dia")
     if dia not in DIAS:
@@ -271,9 +288,9 @@ def validar_refeicao(dados):
         "dia": dia,
         "tipo": tipo,
         "cor": cor,
-        "fixado": 1 if dados.get("fixado") else 0,
+        "fixado": 1 if booleano(dados, "fixado") else 0,
         "itens": json.dumps(itens, ensure_ascii=False),
-        "notas": str(dados.get("notas", "") or "")[:500],
+        "notas": texto(dados, "notas", limite=500),
         **{COLUNAS[n]: v for n, v in totais.items()},
     }
 
@@ -318,22 +335,22 @@ def sem_acento(texto):
 # --------------------------------------------------------------------------- #
 @app.get("/api/health")
 def health():
-    return jsonify({"status": "ok", "api": "python", "porta": 5000})
+    return jsonify({"status": "ok", "api": "python", "porta": PORTA})
 
 
 # ---- Usuários ------------------------------------------------------------- #
 @app.post("/api/usuarios")
 def cadastrar_usuario():
     dados = corpo_json()
-    nome = str(dados.get("nome", "")).strip()
-    email = str(dados.get("email", "")).strip().lower()
-    senha = str(dados.get("senha", ""))
+    nome = texto(dados, "nome", obrigatorio=True, limite=80)
+    email = texto(dados, "email", obrigatorio=True, limite=254).lower()
+    senha = dados.get("senha")
 
     if not nome:
         raise ApiError(400, "O campo 'nome' é obrigatório.")
     if not EMAIL_RE.match(email):
         raise ApiError(400, "Informe um e-mail válido.")
-    if len(senha) < 4:
+    if not isinstance(senha, str) or len(senha) < 4:
         raise ApiError(400, "A senha deve ter pelo menos 4 caracteres.")
 
     db = get_db()
@@ -352,8 +369,10 @@ def cadastrar_usuario():
 @app.post("/api/login")
 def login():
     dados = corpo_json()
-    email = str(dados.get("email", "")).strip().lower()
-    senha = str(dados.get("senha", ""))
+    email = texto(dados, "email", obrigatorio=True, limite=254).lower()
+    senha = dados.get("senha")
+    if not isinstance(senha, str):
+        raise ApiError(400, "O campo 'senha' deve ser um texto.")
     if not email or not senha:
         raise ApiError(400, "Informe e-mail e senha.")
 
@@ -361,7 +380,8 @@ def login():
     if row is None or not check_password_hash(row["senha_hash"], senha):
         raise ApiError(401, "E-mail ou senha incorretos.")
 
-    return jsonify({"id": row["id"], "nome": row["nome"], "email": row["email"]})
+    return jsonify({"id": row["id"], "nome": row["nome"], "email": row["email"],
+                    "token": criar_token(row["id"])})
 
 
 # ---- Catálogo de alimentos ------------------------------------------------ #
@@ -492,4 +512,4 @@ def resumo_refeicoes():
 init_db()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="127.0.0.1", port=PORTA)

@@ -11,6 +11,12 @@ public class Treino {
     private String titulo;
     private String dia;
     private String grupoMuscular;
+    private List<String> gruposMusculares = new ArrayList<>();
+    private String modalidade = "musculacao";
+    private String tipoCardio = "Caminhada";
+    private String intensidade = "moderada";
+    private Double distanciaKm;
+    private boolean concluido;
     private String cor = "padrao";
     private boolean fixado;
     private Integer duracaoMin;
@@ -34,6 +40,19 @@ public class Treino {
 
     public String getGrupoMuscular() { return grupoMuscular; }
     public void setGrupoMuscular(String grupoMuscular) { this.grupoMuscular = grupoMuscular; }
+
+    public List<String> getGruposMusculares() { return gruposMusculares; }
+    public void setGruposMusculares(List<String> grupos) { this.gruposMusculares = grupos == null ? new ArrayList<>() : grupos; }
+    public String getModalidade() { return modalidade; }
+    public void setModalidade(String modalidade) { this.modalidade = modalidade; }
+    public String getTipoCardio() { return tipoCardio; }
+    public void setTipoCardio(String tipoCardio) { this.tipoCardio = tipoCardio; }
+    public String getIntensidade() { return intensidade; }
+    public void setIntensidade(String intensidade) { this.intensidade = intensidade; }
+    public Double getDistanciaKm() { return distanciaKm; }
+    public void setDistanciaKm(Double distanciaKm) { this.distanciaKm = distanciaKm; }
+    public boolean isConcluido() { return concluido; }
+    public void setConcluido(boolean concluido) { this.concluido = concluido; }
 
     public String getCor() { return cor; }
     public void setCor(String cor) { this.cor = cor; }

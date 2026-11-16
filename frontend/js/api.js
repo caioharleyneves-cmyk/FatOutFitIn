@@ -3,14 +3,15 @@
 //   API Python (Flask)       -> http://localhost:5000  (usuários e refeições)
 //   API Java   (Spring Boot) -> http://localhost:8080  (treinos)
 // =====================================================================
-const API_PYTHON = "http://localhost:5000/api";
-const API_JAVA = "http://localhost:8080/api";
+const API_PYTHON = window.FOFI_CONFIG?.apiPython || "http://localhost:5000/api";
+const API_JAVA = window.FOFI_CONFIG?.apiJava || "http://localhost:8080/api";
 
 const SESSAO_KEY = "fofi-usuario";
 
 function getUsuario() {
   try {
-    return JSON.parse(localStorage.getItem(SESSAO_KEY));
+    const usuario = JSON.parse(localStorage.getItem(SESSAO_KEY));
+    return usuario && typeof usuario.token === "string" && usuario.token ? usuario : null;
   } catch {
     return null;
   }
@@ -26,13 +27,13 @@ function sair() {
 }
 
 /**
- * Faz a requisição, envia o usuário logado no cabeçalho X-Usuario-Id
+ * Faz a requisição, envia a sessão assinada no cabeçalho Authorization
  * e transforma respostas de erro ({ "erro": "..." }) em exceções.
  */
 async function requisicao(baseUrl, caminho, { method = "GET", body } = {}) {
   const headers = { "Content-Type": "application/json" };
   const usuario = getUsuario();
-  if (usuario) headers["X-Usuario-Id"] = usuario.id;
+  if (usuario) headers.Authorization = `Bearer ${usuario.token}`;
 
   let resposta;
   try {
@@ -42,7 +43,7 @@ async function requisicao(baseUrl, caminho, { method = "GET", body } = {}) {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
-    const nome = baseUrl === API_JAVA ? "API Java (porta 8080)" : "API Python (porta 5000)";
+    const nome = `${baseUrl === API_JAVA ? "API Java" : "API Python"} (${new URL(baseUrl).origin})`;
     throw new Error(`Não foi possível conectar à ${nome}. Ela está rodando?`);
   }
 
@@ -76,4 +77,10 @@ const apiJava = {
   alternarExercicio: (id, i) => requisicao(API_JAVA, `/treinos/${id}/exercicios/${i}`, { method: "PATCH" }),
   excluirTreino: (id) => requisicao(API_JAVA, `/treinos/${id}`, { method: "DELETE" }),
   resumoTreinos: () => requisicao(API_JAVA, "/treinos/resumo"),
+  catalogo: () => requisicao(API_JAVA, "/catalogo-treinos"),
+  salvarPersonalizado: (tipo, nome) => requisicao(API_JAVA, "/catalogo-treinos/personalizados", { method: "POST", body: { tipo, nome } }),
+  criarCardio: (c) => requisicao(API_JAVA, "/cardios", { method: "POST", body: c }),
+  atualizarCardio: (id, c) => requisicao(API_JAVA, `/cardios/${id}`, { method: "PUT", body: c }),
+  concluirCardio: (id) => requisicao(API_JAVA, `/cardios/${id}/concluir`, { method: "PATCH" }),
+  excluirCardio: (id) => requisicao(API_JAVA, `/cardios/${id}`, { method: "DELETE" }),
 };
