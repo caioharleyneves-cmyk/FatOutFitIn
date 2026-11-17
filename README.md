@@ -23,9 +23,9 @@ encerrá-la e abra `INICIAR.cmd` novamente. A Java será recompilada automaticam
 
 | Nome | Responsabilidade |
 |------|------------------|
-| _Integrante 1_ | _ex.: API Python_ |
-| _Integrante 2_ | _ex.: API Java_ |
-| _Integrante 3_ | _ex.: Front-end_ |
+| _Caio Harley_ | _ex.: API Python_ |
+| _Guilherme Rodrigues_ | _ex.: API Java_ |
+| _Serra_ | _ex.: Front-end_ |
 
 ## 🛠️ Tecnologias
 
